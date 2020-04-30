@@ -21,7 +21,7 @@ from scipy import stats
 pd.set_option('display.width', 400)
 pd.set_option('display.max_columns', 10)
 
-housing = pd.read_csv('D:\\tensor\\Aurelien\\housing.csv')
+housing = pd.read_csv('/Aurelien/housing/housing.csv')
 # print(housing.head())
 # print(housing.info())
 # print(housing['ocean_proximity'].value_counts())
