@@ -6,6 +6,8 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import ElasticNet
+from sklearn import datasets
+from sklearn.linear_model import LogisticRegression
 
 # X = 2 * np.random.rand(100, 1)
 # y = 4 + 3 * X + np.random.randn(100, 1)
@@ -107,24 +109,73 @@ y = 0.5 * X**2 + X + 2 + np.random.randn(m, 1)
 # Ridge
 # X = 2 * np.random.rand(100, 1)
 # y = 4 + 3 * X + np.random.randn(100, 1)
-ridge_reg = Ridge(alpha=1, solver="cholesky")
-ridge_reg.fit(X, y)
-print(ridge_reg.predict([[1.5]]))
+# ridge_reg = Ridge(alpha=1, solver="cholesky")
+# ridge_reg.fit(X, y)
+# print(ridge_reg.predict([[1.5]]))
 # [[4.67832751]]
-sgd_reg = SGDRegressor(penalty="l2")
-sgd_reg.fit(X, y.ravel())
-print(sgd_reg.predict([[1.5]]))
+# sgd_reg = SGDRegressor(penalty="l2")
+# sgd_reg.fit(X, y.ravel())
+# print(sgd_reg.predict([[1.5]]))
 # [4.63049333]
 
 # Lasso
-lasso_reg = Lasso(alpha=0.1)
-lasso_reg.fit(X, y)
-print(lasso_reg.predict([[1.5]]))
+# lasso_reg = Lasso(alpha=0.1)
+# lasso_reg.fit(X, y)
+# print(lasso_reg.predict([[1.5]]))
 # [4.61955096]
 
 # ElasticNet
-elastic_net = ElasticNet(alpha=0.1, l1_ratio=0.5)
-elastic_net.fit(X, y)
-print(elastic_net.predict([[1.5]]))
+# elastic_net = ElasticNet(alpha=0.1, l1_ratio=0.5)
+# elastic_net.fit(X, y)
+# print(elastic_net.predict([[1.5]]))
 # [4.62260351]
+
+### Logistic Regression
+iris = datasets.load_iris()
+# print(list(iris.keys()))
+# ['data', 'target', 'target_names', 'DESCR', 'feature_names', 'filename']
+# X = iris["data"][:, 3:] # petal width
+# print(X[:10])
+# y = (iris["target"] == 2).astype(np.int) # 1 if Iris-Virginica, else 0
+# print(y[:10])
+
+# log_reg = LogisticRegression()
+# log_reg.fit(X, y)
+
+# X_new = np.linspace(0, 3, 1000).reshape(-1, 1)
+# y_proba = log_reg.predict_proba(X_new)
+# plt.plot(X_new, y_proba[:, 1], "g-", label="Iris-Virginica")
+# plt.plot(X_new, y_proba[:, 0], "b--", label="Not Iris-Virginica")
+# plt.show()
+
+# print(log_reg.predict([[1.7], [1.5]]))
+# [1 0]
+
+### Multinomial Logistic Regression
+# X = iris["data"][:, (2, 3)] # petal length, petal width
+# y = iris["target"]
+# softmax_reg = LogisticRegression(multi_class="multinomial",solver="lbfgs", C=10)
+# softmax_reg.fit(X, y)
+# print(softmax_reg.predict([[5, 2]]))
+# [2]
+# print(softmax_reg.predict_proba([[5, 2]]))
+# [[6.38014896e-07 5.74929995e-02 9.42506362e-01]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
