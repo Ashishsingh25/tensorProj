@@ -199,14 +199,15 @@ forest_clf = RandomForestClassifier(random_state=42)
 # plt.show()
 
 ##### Multilabel Classification
-
+print('start')
 y_train_large = (y_train >= 7)
 y_train_odd = (y_train % 2 == 1)
 y_multilabel = np.c_[y_train_large, y_train_odd]
 knn_clf = KNeighborsClassifier()
-knn_clf.fit(X_train, y_multilabel)
-print(knn_clf.predict([some_digit]))
-y_train_knn_pred = cross_val_predict(knn_clf, X_train, y_multilabel, cv=3)
-print(f1_score(y_multilabel, y_train_knn_pred, average="macro"))
+# knn_clf.fit(X_train, y_multilabel)
+# print(knn_clf.predict([some_digit]))
 # [[False  True]]
+y_train_knn_pred = cross_val_predict(knn_clf, X_train, y_multilabel, cv=3, verbose= 2, n_jobs = -1)
+print(f1_score(y_multilabel, y_train_knn_pred, average="macro"))
+# 0.976410265560605
 
