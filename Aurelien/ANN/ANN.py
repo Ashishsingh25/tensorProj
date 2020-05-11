@@ -8,6 +8,9 @@ import pandas as pd
 from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from scipy.stats import reciprocal
+from sklearn.model_selection import RandomizedSearchCV
+
 
 ### Perceptron
 # iris = load_iris()
@@ -144,8 +147,8 @@ X_train = scaler.fit_transform(X_train)
 # (11610, 8)
 X_valid = scaler.transform(X_valid)
 X_test = scaler.transform(X_test)
-np.random.seed(42)
-tf.random.set_seed(42)
+# np.random.seed(42)
+# tf.random.set_seed(42)
 
 # simple model
 
@@ -224,10 +227,10 @@ X_new = X_test[:3]
 # model = keras.models.Model(inputs=[input_A, input_B], outputs=[output])
 # model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
 #
-X_train_A, X_train_B = X_train[:, :5], X_train[:, 2:]
-X_valid_A, X_valid_B = X_valid[:, :5], X_valid[:, 2:]
-X_test_A, X_test_B = X_test[:, :5], X_test[:, 2:]
-X_new_A, X_new_B = X_test_A[:3], X_test_B[:3]
+# X_train_A, X_train_B = X_train[:, :5], X_train[:, 2:]
+# X_valid_A, X_valid_B = X_valid[:, :5], X_valid[:, 2:]
+# X_test_A, X_test_B = X_test[:, :5], X_test[:, 2:]
+# X_new_A, X_new_B = X_test_A[:3], X_test_B[:3]
 #
 # history = model.fit((X_train_A, X_train_B), y_train, epochs=20, validation_data=((X_valid_A, X_valid_B), y_valid))
 # # loss: 0.4259 - val_loss: 0.3976
@@ -334,14 +337,14 @@ X_new_A, X_new_B = X_test_A[:3], X_test_B[:3]
 
 # Callback
 
-keras.backend.clear_session()
-np.random.seed(42)
-tf.random.set_seed(42)
-
-model = keras.models.Sequential([
-    keras.layers.Dense(30, activation="relu", input_shape=[8]),
-    keras.layers.Dense(30, activation="relu"),
-    keras.layers.Dense(1)])
+# keras.backend.clear_session()
+# np.random.seed(42)
+# tf.random.set_seed(42)
+#
+# model = keras.models.Sequential([
+#     keras.layers.Dense(30, activation="relu", input_shape=[8]),
+#     keras.layers.Dense(30, activation="relu"),
+#     keras.layers.Dense(1)])
 
 # model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
 checkpoint_cb = keras.callbacks.ModelCheckpoint("my_keras_model.h5", save_best_only=True)
@@ -353,11 +356,59 @@ checkpoint_cb = keras.callbacks.ModelCheckpoint("my_keras_model.h5", save_best_o
 
 # Callback with Early Stopping
 
-model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
+# model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
 early_stopping_cb = keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)
-history = model.fit(X_train, y_train, epochs=100, validation_data=(X_valid, y_valid),
-                    callbacks=[checkpoint_cb, early_stopping_cb])
-# loss: 0.3295 - val_loss: 0.3205
-mse_test = model.evaluate(X_test, y_test)
-print(mse_test)
-# 0.32932399090870407
+# history = model.fit(X_train, y_train, epochs=100, validation_data=(X_valid, y_valid),
+#                     callbacks=[checkpoint_cb, early_stopping_cb])
+# # loss: 0.3295 - val_loss: 0.3205
+# mse_test = model.evaluate(X_test, y_test)
+# print(mse_test)
+# # 0.32932399090870407
+
+### Fine-Tuning Hyperparameters
+
+keras.backend.clear_session()
+np.random.seed(42)
+tf.random.set_seed(42)
+
+def build_model(n_hidden=1, n_neurons=30, learning_rate=3e-3, input_shape=[8]):
+    model = keras.models.Sequential()
+    model.add(keras.layers.InputLayer(input_shape=input_shape))
+    for layer in range(n_hidden):
+        model.add(keras.layers.Dense(n_neurons, activation="relu"))
+    model.add(keras.layers.Dense(1))
+    optimizer = keras.optimizers.SGD(lr=learning_rate)
+    model.compile(loss="mse", optimizer=optimizer)
+    return model
+
+keras_reg = keras.wrappers.scikit_learn.KerasRegressor(build_model)
+# keras_reg.fit(X_train, y_train, epochs=100,
+#               validation_data=(X_valid, y_valid),
+#               callbacks=[keras.callbacks.EarlyStopping(patience=10)])
+# # 0.3442 - val_loss: 0.4654
+# mse_test = keras_reg.score(X_test, y_test)
+# print(mse_test)
+# # -0.3472500825806182
+# y_pred = keras_reg.predict(X_new)
+# print(y_pred)
+# # [0.6616513 1.650584  4.104437 ]
+
+# using RandomizedSearchCV to compare sets of hyperparameter
+param_distribs = {
+    "n_hidden": np.arange(1, 3),
+    "n_neurons": np.arange(1, 100),
+    "learning_rate": reciprocal(3e-4, 3e-2),
+}
+
+rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=10, cv=3, verbose=0)
+rnd_search_cv.fit(X_train, y_train, epochs=100,
+                  validation_data=(X_valid, y_valid),
+                  callbacks=[checkpoint_cb])
+# rnd_search_cv = keras.models.load_model("my_keras_model.h5")
+print(rnd_search_cv.best_params_)
+print(rnd_search_cv.best_score_)
+print(rnd_search_cv.best_estimator_)
+print(rnd_search_cv.score(X_test, y_test))
+model = rnd_search_cv.best_estimator_.model
+print(model)
+print(model.evaluate(X_test, y_test))
