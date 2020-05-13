@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from functools import partial
 
 # print([name for name in dir(keras.initializers) if not name.startswith("_")])
 # ['Constant', 'GlorotNormal', 'GlorotUniform', 'Identity', 'Initializer', 'Ones', 'Orthogonal', 'RandomNormal',
@@ -287,3 +288,57 @@ np.random.seed(42)
 # n_epochs = 25
 # history = model.fit(X_train_scaled, y_train, epochs=n_epochs, validation_data=(X_valid_scaled, y_valid))
 # loss: 0.2194 - accuracy: 0.9239 - val_loss: 0.3221 - val_accuracy: 0.8878
+
+### Regularization
+
+# l1 and l2
+
+# layer = keras.layers.Dense(100, activation="elu",
+#                            kernel_initializer="he_normal",
+#                            kernel_regularizer=keras.regularizers.l2(0.01))
+# or l1(0.1) for ℓ1 regularization with a factor or 0.1
+# or l1_l2(0.1, 0.01) for both ℓ1 and ℓ2 regularization, with factors 0.1 and 0.01 respectively
+
+# Instead of declaring parameters for layers repeated, better create a function using functool
+
+# RegularizedDense = partial(keras.layers.Dense, activation="elu", kernel_initializer="he_normal",
+#                            kernel_regularizer=keras.regularizers.l2(0.01))
+# model = keras.models.Sequential([
+#     keras.layers.Flatten(input_shape=[28, 28]),
+#     RegularizedDense(300),
+#     RegularizedDense(100),
+#     RegularizedDense(10, activation="softmax")])
+# model.compile(loss="sparse_categorical_crossentropy", optimizer="nadam", metrics=["accuracy"])
+# n_epochs = 20
+# history = model.fit(X_train_scaled, y_train, epochs=n_epochs, validation_data=(X_valid_scaled, y_valid))
+# loss: 0.6757 - accuracy: 0.8406 - val_loss: 0.6687 - val_accuracy: 0.8452
+
+# Dropout
+
+# model = keras.models.Sequential([
+#     keras.layers.Flatten(input_shape=[28, 28]),
+#     keras.layers.Dropout(rate=0.2),
+#     keras.layers.Dense(300, activation="elu", kernel_initializer="he_normal"),
+#     keras.layers.Dropout(rate=0.2),
+#     keras.layers.Dense(100, activation="elu", kernel_initializer="he_normal"),
+#     keras.layers.Dropout(rate=0.2),
+#     keras.layers.Dense(10, activation="softmax")])
+# model.compile(loss="sparse_categorical_crossentropy", optimizer="nadam", metrics=["accuracy"])
+# n_epochs = 20
+# history = model.fit(X_train_scaled, y_train, epochs=n_epochs, validation_data=(X_valid_scaled, y_valid))
+# loss: 0.2832 - accuracy: 0.8945 - val_loss: 0.3001 - val_accuracy: 0.8944
+
+# Max Norm
+
+MaxNormDense = partial(keras.layers.Dense, activation="selu", kernel_initializer="lecun_normal",
+                       kernel_constraint=keras.constraints.max_norm(1.))
+
+model = keras.models.Sequential([
+    keras.layers.Flatten(input_shape=[28, 28]),
+    MaxNormDense(300),
+    MaxNormDense(100),
+    keras.layers.Dense(10, activation="softmax")])
+model.compile(loss="sparse_categorical_crossentropy", optimizer="nadam", metrics=["accuracy"])
+n_epochs = 20
+history = model.fit(X_train_scaled, y_train, epochs=n_epochs, validation_data=(X_valid_scaled, y_valid))
+# loss: 0.2913 - accuracy: 0.8905 - val_loss: 0.3201 - val_accuracy: 0.8812
