@@ -330,15 +330,16 @@ np.random.seed(42)
 
 # Max Norm
 
-MaxNormDense = partial(keras.layers.Dense, activation="selu", kernel_initializer="lecun_normal",
-                       kernel_constraint=keras.constraints.max_norm(1.))
-
-model = keras.models.Sequential([
-    keras.layers.Flatten(input_shape=[28, 28]),
-    MaxNormDense(300),
-    MaxNormDense(100),
-    keras.layers.Dense(10, activation="softmax")])
-model.compile(loss="sparse_categorical_crossentropy", optimizer="nadam", metrics=["accuracy"])
-n_epochs = 20
-history = model.fit(X_train_scaled, y_train, epochs=n_epochs, validation_data=(X_valid_scaled, y_valid))
+# MaxNormDense = partial(keras.layers.Dense, activation="selu", kernel_initializer="lecun_normal",
+#                        kernel_constraint=keras.constraints.max_norm(1.))
+#
+# model = keras.models.Sequential([
+#     keras.layers.Flatten(input_shape=[28, 28]),
+#     MaxNormDense(300),
+#     MaxNormDense(100),
+#     keras.layers.Dense(10, activation="softmax")])
+# model.compile(loss="sparse_categorical_crossentropy", optimizer="nadam", metrics=["accuracy"])
+# n_epochs = 20
+# history = model.fit(X_train_scaled, y_train, epochs=n_epochs, validation_data=(X_valid_scaled, y_valid))
 # loss: 0.2913 - accuracy: 0.8905 - val_loss: 0.3201 - val_accuracy: 0.8812
+
