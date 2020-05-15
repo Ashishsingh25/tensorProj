@@ -271,48 +271,48 @@ tf.random.set_seed(42)
 
 ### Custom Training Loops
 
-l2_reg = keras.regularizers.l2(0.05)
-model = keras.models.Sequential([keras.layers.Dense(30, activation="elu", kernel_initializer="he_normal",
-                                                    kernel_regularizer=l2_reg),
-    keras.layers.Dense(1, kernel_regularizer=l2_reg)])
-
-def random_batch(X, y, batch_size=32):
-    idx = np.random.randint(len(X), size=batch_size)
-    return X[idx], y[idx]
-
-def print_status_bar(iteration, total, loss, metrics=None):
-    metrics = " - ".join(["{}: {:.4f}".format(m.name, m.result()) for m in [loss] + (metrics or [])])
-    end = "" if iteration < total else "\n"
-    print("\r{}/{} - ".format(iteration, total) + metrics, end=end)
-
-n_epochs = 5
-batch_size = 32
-n_steps = len(X_train) // batch_size
-optimizer = keras.optimizers.Nadam(lr=0.01)
-loss_fn = keras.losses.mean_squared_error
-mean_loss = keras.metrics.Mean()
-metrics = [keras.metrics.MeanAbsoluteError()]
-
-for epoch in range(1, n_epochs + 1):
-    print("Epoch {}/{}".format(epoch, n_epochs))
-    for step in range(1, n_steps + 1):
-        X_batch, y_batch = random_batch(X_train_scaled, y_train)
-        with tf.GradientTape() as tape:
-            y_pred = model(X_batch)
-            main_loss = tf.reduce_mean(loss_fn(y_batch, y_pred))
-            loss = tf.add_n([main_loss] + model.losses)
-        gradients = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        for variable in model.variables:
-            if variable.constraint is not None:
-                variable.assign(variable.constraint(variable))
-        mean_loss(loss)
-        for metric in metrics:
-            metric(y_batch, y_pred)
-        print_status_bar(step * batch_size, len(y_train), mean_loss, metrics)
-    print_status_bar(len(y_train), len(y_train), mean_loss, metrics)
-    for metric in [mean_loss] + metrics:
-        metric.reset_states()
+# l2_reg = keras.regularizers.l2(0.05)
+# model = keras.models.Sequential([keras.layers.Dense(30, activation="elu", kernel_initializer="he_normal",
+#                                                     kernel_regularizer=l2_reg),
+#     keras.layers.Dense(1, kernel_regularizer=l2_reg)])
+#
+# def random_batch(X, y, batch_size=32):
+#     idx = np.random.randint(len(X), size=batch_size)
+#     return X[idx], y[idx]
+#
+# def print_status_bar(iteration, total, loss, metrics=None):
+#     metrics = " - ".join(["{}: {:.4f}".format(m.name, m.result()) for m in [loss] + (metrics or [])])
+#     end = "" if iteration < total else "\n"
+#     print("\r{}/{} - ".format(iteration, total) + metrics, end=end)
+#
+# n_epochs = 5
+# batch_size = 32
+# n_steps = len(X_train) // batch_size
+# optimizer = keras.optimizers.Nadam(lr=0.01)
+# loss_fn = keras.losses.mean_squared_error
+# mean_loss = keras.metrics.Mean()
+# metrics = [keras.metrics.MeanAbsoluteError()]
+#
+# for epoch in range(1, n_epochs + 1):
+#     print("Epoch {}/{}".format(epoch, n_epochs))
+#     for step in range(1, n_steps + 1):
+#         X_batch, y_batch = random_batch(X_train_scaled, y_train)
+#         with tf.GradientTape() as tape:
+#             y_pred = model(X_batch)
+#             main_loss = tf.reduce_mean(loss_fn(y_batch, y_pred))
+#             loss = tf.add_n([main_loss] + model.losses)
+#         gradients = tape.gradient(loss, model.trainable_variables)
+#         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+#         for variable in model.variables:
+#             if variable.constraint is not None:
+#                 variable.assign(variable.constraint(variable))
+#         mean_loss(loss)
+#         for metric in metrics:
+#             metric(y_batch, y_pred)
+#         print_status_bar(step * batch_size, len(y_train), mean_loss, metrics)
+#     print_status_bar(len(y_train), len(y_train), mean_loss, metrics)
+#     for metric in [mean_loss] + metrics:
+#         metric.reset_states()
 
 # Epoch 1/5
 # WARNING:tensorflow:Layer dense is casting an input tensor from dtype float64 to the layer's dtype of float32, which is new behavior in TensorFlow 2.  The layer has dtype float32 because it's dtype defaults to floatx.
@@ -334,6 +334,49 @@ for epoch in range(1, n_epochs + 1):
 #
 # Process finished with exit code 0
 
+### TensorFlow Functions
+
+# def cube(x):
+#     return x ** 3
+# print(cube(2))
+# # 8
+# print(cube(tf.constant(2.0)))
+# # tf.Tensor(8.0, shape=(), dtype=float32)
+#
+# tf_cube = tf.function(cube)
+# print(tf_cube)
+# # <tensorflow.python.eager.def_function.Function object at 0x0000020EFD8E2D08>
+# print(tf_cube(2))
+# # tf.Tensor(8, shape=(), dtype=int32)
+# print(tf_cube(tf.constant(2.0)))
+# # tf.Tensor(8.0, shape=(), dtype=float32)
+#
+# @tf.function
+# def add_10(x):
+#     for i in tf.range(10):
+#         x += 1
+#     return x
+# print(tf.autograph.to_code(add_10.python_function))
+# def tf__add_10(x):
+#   do_return = False
+#   retval_ = ag__.UndefinedReturnValue()
+#   with ag__.FunctionScope('add_10', 'fscope', ag__.ConversionOptions(recursive=True, user_requested=True, optional_features=(), internal_convert_user_code=True)) as fscope:
+#
+#     def get_state():
+#       return ()
+#
+#     def set_state(_):
+#       pass
+#
+#     def loop_body(iterates, x):
+#       i = iterates
+#       x += 1
+#       return x,
+#     x, = ag__.for_stmt(ag__.converted_call(tf.range, (10,), None, fscope), None, loop_body, get_state, set_state, (x,), ('x',), ())
+#     do_return = True
+#     retval_ = fscope.mark_return_value(x)
+#   do_return,
+#   return ag__.retval(retval_)
 
 
 
