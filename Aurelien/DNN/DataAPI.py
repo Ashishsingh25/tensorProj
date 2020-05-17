@@ -61,7 +61,6 @@ housing = fetch_california_housing()
 X_train_full, X_test, y_train_full, y_test = train_test_split(housing.data, housing.target.reshape(-1, 1),
                                                               random_state=42)
 X_train, X_valid, y_train, y_valid = train_test_split(X_train_full, y_train_full, random_state=42)
-
 scaler = StandardScaler()
 scaler.fit(X_train)
 X_mean = scaler.mean_
@@ -97,15 +96,15 @@ X_std = scaler.scale_
 # print(train_filepaths)
 # print(valid_filepaths)
 # print(test_filepaths)
-path_format = os.path.join(os.path.join("datasets","housing"), "my_{}_{:02d}.csv")
-train_filepaths = []
-for i in range(20):
-    train_filepaths.append(path_format.format("train", i))
-valid_filepaths = []
-test_filepaths = []
-for i in range(10):
-    valid_filepaths.append(path_format.format("valid", i))
-    test_filepaths.append(path_format.format("test", i))
+# path_format = os.path.join(os.path.join("datasets","housing"), "my_{}_{:02d}.csv")
+# train_filepaths = []
+# for i in range(20):
+#     train_filepaths.append(path_format.format("train", i))
+# valid_filepaths = []
+# test_filepaths = []
+# for i in range(10):
+#     valid_filepaths.append(path_format.format("valid", i))
+#     test_filepaths.append(path_format.format("test", i))
 
 # print(pd.read_csv(train_filepaths[0]).head())
 #    MedInc  HouseAge  AveRooms  ...  Latitude  Longitude  MedianHouseValue
@@ -182,14 +181,14 @@ for i in range(10):
 
 # preprocessing
 
-n_inputs = 8 # X_train.shape[-1]
-@tf.function
-def preprocess(line):
-    defs = [0.] * n_inputs + [tf.constant([], dtype=tf.float32)]
-    fields = tf.io.decode_csv(line, record_defaults=defs)
-    x = tf.stack(fields[:-1])
-    y = tf.stack(fields[-1:])
-    return (x - X_mean) / X_std, y
+# n_inputs = 8 # X_train.shape[-1]
+# @tf.function
+# def preprocess(line):
+#     defs = [0.] * n_inputs + [tf.constant([], dtype=tf.float32)]
+#     fields = tf.io.decode_csv(line, record_defaults=defs)
+#     x = tf.stack(fields[:-1])
+#     y = tf.stack(fields[-1:])
+#     return (x - X_mean) / X_std, y
 
 # print(preprocess(b'4.2083,44.0,5.3232,0.9171,846.0,2.3370,37.47,-122.2,2.782'))
 # (<tf.Tensor: shape=(8,), dtype=float32, numpy=
@@ -199,17 +198,17 @@ def preprocess(line):
 
 #  data read
 
-def csv_reader_dataset(filepaths, repeat=1, n_readers=5,
-                       n_read_threads=None, shuffle_buffer_size=10000,
-                       n_parse_threads=5, batch_size=32):
-    dataset = tf.data.Dataset.list_files(filepaths).repeat(repeat)
-    dataset = dataset.interleave(
-        lambda filepath: tf.data.TextLineDataset(filepath).skip(1),
-        cycle_length=n_readers, num_parallel_calls=n_read_threads)
-    dataset = dataset.shuffle(shuffle_buffer_size)
-    dataset = dataset.map(preprocess, num_parallel_calls=n_parse_threads)
-    dataset = dataset.batch(batch_size)
-    return dataset.prefetch(1)
+# def csv_reader_dataset(filepaths, repeat=1, n_readers=5,
+#                        n_read_threads=None, shuffle_buffer_size=10000,
+#                        n_parse_threads=5, batch_size=32):
+#     dataset = tf.data.Dataset.list_files(filepaths).repeat(repeat)
+#     dataset = dataset.interleave(
+#         lambda filepath: tf.data.TextLineDataset(filepath).skip(1),
+#         cycle_length=n_readers, num_parallel_calls=n_read_threads)
+#     dataset = dataset.shuffle(shuffle_buffer_size)
+#     dataset = dataset.map(preprocess, num_parallel_calls=n_parse_threads)
+#     dataset = dataset.batch(batch_size)
+#     return dataset.prefetch(1)
 
 # tf.random.set_seed(42)
 # train_set = csv_reader_dataset(train_filepaths, batch_size=3)
@@ -243,25 +242,25 @@ def csv_reader_dataset(filepaths, repeat=1, n_readers=5,
 
 # using tf.keras
 
-train_set = csv_reader_dataset(train_filepaths, repeat=None)
-valid_set = csv_reader_dataset(valid_filepaths)
-test_set = csv_reader_dataset(test_filepaths)
+# train_set = csv_reader_dataset(train_filepaths, repeat=None)
+# valid_set = csv_reader_dataset(valid_filepaths)
+# test_set = csv_reader_dataset(test_filepaths)
+#
+# keras.backend.clear_session()
+# np.random.seed(42)
+# tf.random.set_seed(42)
+# model = keras.models.Sequential([keras.layers.Dense(30, activation="relu", input_shape=X_train.shape[1:]),
+#                                  keras.layers.Dense(1)])
+# model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
+# batch_size = 32
+# model.fit(train_set, steps_per_epoch=len(X_train) // batch_size, epochs=10, validation_data=valid_set)
+# # loss: 0.4826 - val_loss: 0.4714
+# model.evaluate(test_set, steps=len(X_test) // batch_size)
+# # loss: 0.4788
 
-keras.backend.clear_session()
-np.random.seed(42)
-tf.random.set_seed(42)
-model = keras.models.Sequential([keras.layers.Dense(30, activation="relu", input_shape=X_train.shape[1:]),
-                                 keras.layers.Dense(1)])
-model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
-batch_size = 32
-model.fit(train_set, steps_per_epoch=len(X_train) // batch_size, epochs=10, validation_data=valid_set)
-# loss: 0.4826 - val_loss: 0.4714
-model.evaluate(test_set, steps=len(X_test) // batch_size)
-# loss: 0.4788
-
-new_set = test_set.map(lambda X, y: X) # we could instead just pass test_set, Keras would ignore the labels
-X_new = X_test
-print(model.predict(new_set, steps=len(X_new) // batch_size))
+# new_set = test_set.map(lambda X, y: X) # we could instead just pass test_set, Keras would ignore the labels
+# X_new = X_test
+# print(model.predict(new_set, steps=len(X_new) // batch_size))
 # [[3.837813 ]
 #  [2.395659 ]
 #  [1.4261606]
@@ -269,5 +268,62 @@ print(model.predict(new_set, steps=len(X_new) // batch_size))
 #  [1.6820569]
 #  [1.8740587]
 #  [0.765728 ]]
+
+### Feature API
+
+housing = pd.read_csv('D:\\tensor\\Aurelien\\housing\\housing.csv')
+# print(housing.head())
+
+age_mean, age_std = X_mean[1], X_std[1]  # The median age is column in 1
+housing_median_age = tf.feature_column.numeric_column("housing_median_age",
+                                                      normalizer_fn=lambda x: (x - age_mean) / age_std)
+median_income = tf.feature_column.numeric_column("median_income")
+bucketized_income = tf.feature_column.bucketized_column(median_income, boundaries=[1.5, 3., 4.5, 6.])
+print(bucketized_income)
+# BucketizedColumn(source_column=NumericColumn(key='median_income', shape=(1,), default_value=None, dtype=tf.float32,
+#                                              normalizer_fn=None), boundaries=(1.5, 3.0, 4.5, 6.0))
+ocean_prox_vocab = ['<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN']
+ocean_proximity = tf.feature_column.categorical_column_with_vocabulary_list("ocean_proximity", ocean_prox_vocab)
+print(ocean_proximity)
+# VocabularyListCategoricalColumn(key='ocean_proximity',
+#                                 vocabulary_list=('<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN'),
+#                                 dtype=tf.string, default_value=-1, num_oov_buckets=0)
+bucketized_age = tf.feature_column.bucketized_column(housing_median_age,
+                                                     boundaries=[-1., -0.5, 0., 0.5, 1.]) # age was scaled
+age_and_ocean_proximity = tf.feature_column.crossed_column([bucketized_age, ocean_proximity], hash_bucket_size=100)
+
+# crossed column
+
+
+latitude = tf.feature_column.numeric_column("latitude")
+longitude = tf.feature_column.numeric_column("longitude")
+bucketized_latitude = tf.feature_column.bucketized_column(latitude, boundaries=list(np.linspace(32., 42., 20 - 1)))
+bucketized_longitude = tf.feature_column.bucketized_column(longitude,
+                                                           boundaries=list(np.linspace(-125., -114., 20 - 1)))
+location = tf.feature_column.crossed_column([bucketized_latitude, bucketized_longitude], hash_bucket_size=1000)
+
+#  One-Hot Vectors
+
+ocean_proximity_one_hot = tf.feature_column.indicator_column(ocean_proximity)
+
+#  embeddings
+
+ocean_proximity_embed = tf.feature_column.embedding_column(ocean_proximity, dimension=2)
+
+# Feature Columns for Parsing
+
+median_house_value = tf.feature_column.numeric_column("median_house_value")
+columns = [housing_median_age, median_house_value]
+feature_descriptions = tf.feature_column.make_parse_example_spec(columns)
+print(feature_descriptions)
+# {'housing_median_age': FixedLenFeature(shape=(1,), dtype=tf.float32, default_value=None),
+#  'median_house_value': FixedLenFeature(shape=(1,), dtype=tf.float32, default_value=None)}
+
+
+
+
+
+
+
 
 
