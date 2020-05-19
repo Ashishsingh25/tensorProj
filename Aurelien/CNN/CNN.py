@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.datasets import load_sample_image
 import tensorflow as tf
 from tensorflow import keras
+import tensorflow_datasets as tfds
 from functools import partial
 
 def plot_image(image):
@@ -41,19 +42,19 @@ def plot_color_image(image):
 
 ### Fashion MNIST
 
-(X_train_full, y_train_full), (X_test, y_test) = keras.datasets.fashion_mnist.load_data()
-X_train, X_valid = X_train_full[:-5000], X_train_full[-5000:]
-y_train, y_valid = y_train_full[:-5000], y_train_full[-5000:]
-
-X_mean = X_train.mean(axis=0, keepdims=True)
-X_std = X_train.std(axis=0, keepdims=True) + 1e-7
-X_train = (X_train - X_mean) / X_std
-X_valid = (X_valid - X_mean) / X_std
-X_test = (X_test - X_mean) / X_std
-
-X_train = X_train[..., np.newaxis]
-X_valid = X_valid[..., np.newaxis]
-X_test = X_test[..., np.newaxis]
+# (X_train_full, y_train_full), (X_test, y_test) = keras.datasets.fashion_mnist.load_data()
+# X_train, X_valid = X_train_full[:-5000], X_train_full[-5000:]
+# y_train, y_valid = y_train_full[:-5000], y_train_full[-5000:]
+#
+# X_mean = X_train.mean(axis=0, keepdims=True)
+# X_std = X_train.std(axis=0, keepdims=True) + 1e-7
+# X_train = (X_train - X_mean) / X_std
+# X_valid = (X_valid - X_mean) / X_std
+# X_test = (X_test - X_mean) / X_std
+#
+# X_train = X_train[..., np.newaxis]
+# X_valid = X_valid[..., np.newaxis]
+# X_test = X_test[..., np.newaxis]
 
 # DefaultConv2D = partial(keras.layers.Conv2D, kernel_size=3, activation='relu', padding="SAME")
 #
@@ -197,15 +198,248 @@ X_test = X_test[..., np.newaxis]
 # Non-trainable params: 17,024
 # _________________________________________________________________
 
+### Pretrained Model - ResNet 50
 
+# model = keras.applications.resnet50.ResNet50(weights="imagenet")
+# china_box = [0, 0.03, 1, 0.68]
+# flower_box = [0.19, 0.26, 0.86, 0.7]
+# images_resized = tf.image.crop_and_resize(images, [china_box, flower_box], [0, 1], [224, 224])
+# tf.image.crop_and_resize(image, boxes, box_indices, CROP_SIZE)
+# plot_color_image(images_resized[0])
+# plt.show()
+# plot_color_image(images_resized[1])
+# plt.show()
+# inputs = keras.applications.resnet50.preprocess_input(images_resized * 255)
+# Y_proba = model.predict(inputs)
+# print(Y_proba.shape)
+# # (2, 1000)
+# top_K = keras.applications.resnet50.decode_predictions(Y_proba, top=3)
+# for image_index in range(len(images)):
+#     print("Image #{}".format(image_index))
+#     for class_id, name, y_proba in top_K[image_index]:
+#         print("  {} - {:12s} {:.2f}%".format(class_id, name, y_proba * 100))
+#     print()
+# Image #0
+#   n03877845 - palace       43.39%
+#   n02825657 - bell_cote    43.07%
+#   n03781244 - monastery    11.70%
+#
+# Image #1
+#   n04522168 - vase         53.96%
+#   n07930864 - cup          9.52%
+#   n11939491 - daisy        4.97%
 
+### Transfer Learning - xception
 
+dataset, info = tfds.load("tf_flowers", as_supervised=True, with_info=True)
+# print(info.splits)
+# # {'train': <tfds.core.SplitInfo num_examples=3670>}
+# print(info.splits["train"])
+# # <tfds.core.SplitInfo num_examples=3670>
+class_names = info.features["label"].names
+# print(class_names)
+# # ['dandelion', 'daisy', 'tulips', 'sunflowers', 'roses']
+n_classes = info.features["label"].num_classes
+# print(n_classes)
+# # 5
+dataset_size = info.splits["train"].num_examples
+# print(dataset_size)
+# # 3670
+test_set_raw, valid_set_raw, train_set_raw = tfds.load("tf_flowers",
+                                                       split=["train[:10%]", "train[10%:25%]", "train[25%:]"],
+                                                       as_supervised=True)
+# plt.figure(figsize=(12, 10))
+# index = 0
+# for image, label in train_set_raw.take(9):
+#     index += 1
+#     plt.subplot(3, 3, index)
+#     plt.imshow(image)
+#     plt.title("Class: {}".format(class_names[label]))
+#     plt.axis("off")
+# plt.show()
 
+# preprocessing
+def preprocess(image, label):
+    resized_image = tf.image.resize(image, [224, 224])
+    final_image = keras.applications.xception.preprocess_input(resized_image)
+    return final_image, label
+batch_size = 32
+train_set = train_set_raw.shuffle(1000).repeat()
+train_set = train_set.map(preprocess).batch(batch_size).prefetch(1)
+valid_set = valid_set_raw.map(preprocess).batch(batch_size).prefetch(1)
+test_set = test_set_raw.map(preprocess).batch(batch_size).prefetch(1)
+# plt.figure(figsize=(12, 12))
+# for X_batch, y_batch in train_set.take(1):
+#     for index in range(9):
+#         plt.subplot(3, 3, index + 1)
+#         plt.imshow(X_batch[index] / 2 + 0.5)
+#         plt.title("Class: {}".format(class_names[y_batch[index]]))
+#         plt.axis("off")
+#
+# plt.show()
 
+# Loading only bottom layers of Xception model
+base_model = keras.applications.xception.Xception(weights="imagenet",include_top=False)
+avg = keras.layers.GlobalAveragePooling2D()(base_model.output)
+output = keras.layers.Dense(n_classes, activation="softmax")(avg)
+model = keras.models.Model(inputs=base_model.input, outputs=output)
+for index, layer in enumerate(base_model.layers):
+    print(index, layer.name)
+# 0 input_1
+# 1 block1_conv1
+# 2 block1_conv1_bn
+# 3 block1_conv1_act
+# 4 block1_conv2
+# 5 block1_conv2_bn
+# 6 block1_conv2_act
+# 7 block2_sepconv1
+# 8 block2_sepconv1_bn
+# 9 block2_sepconv2_act
+# 10 block2_sepconv2
+# 11 block2_sepconv2_bn
+# 12 conv2d
+# 13 block2_pool
+# 14 batch_normalization
+# 15 add
+# 16 block3_sepconv1_act
+# 17 block3_sepconv1
+# 18 block3_sepconv1_bn
+# 19 block3_sepconv2_act
+# 20 block3_sepconv2
+# 21 block3_sepconv2_bn
+# 22 conv2d_1
+# 23 block3_pool
+# 24 batch_normalization_1
+# 25 add_1
+# 26 block4_sepconv1_act
+# 27 block4_sepconv1
+# 28 block4_sepconv1_bn
+# 29 block4_sepconv2_act
+# 30 block4_sepconv2
+# 31 block4_sepconv2_bn
+# 32 conv2d_2
+# 33 block4_pool
+# 34 batch_normalization_2
+# 35 add_2
+# 36 block5_sepconv1_act
+# 37 block5_sepconv1
+# 38 block5_sepconv1_bn
+# 39 block5_sepconv2_act
+# 40 block5_sepconv2
+# 41 block5_sepconv2_bn
+# 42 block5_sepconv3_act
+# 43 block5_sepconv3
+# 44 block5_sepconv3_bn
+# 45 add_3
+# 46 block6_sepconv1_act
+# 47 block6_sepconv1
+# 48 block6_sepconv1_bn
+# 49 block6_sepconv2_act
+# 50 block6_sepconv2
+# 51 block6_sepconv2_bn
+# 52 block6_sepconv3_act
+# 53 block6_sepconv3
+# 54 block6_sepconv3_bn
+# 55 add_4
+# 56 block7_sepconv1_act
+# 57 block7_sepconv1
+# 58 block7_sepconv1_bn
+# 59 block7_sepconv2_act
+# 60 block7_sepconv2
+# 61 block7_sepconv2_bn
+# 62 block7_sepconv3_act
+# 63 block7_sepconv3
+# 64 block7_sepconv3_bn
+# 65 add_5
+# 66 block8_sepconv1_act
+# 67 block8_sepconv1
+# 68 block8_sepconv1_bn
+# 69 block8_sepconv2_act
+# 70 block8_sepconv2
+# 71 block8_sepconv2_bn
+# 72 block8_sepconv3_act
+# 73 block8_sepconv3
+# 74 block8_sepconv3_bn
+# 75 add_6
+# 76 block9_sepconv1_act
+# 77 block9_sepconv1
+# 78 block9_sepconv1_bn
+# 79 block9_sepconv2_act
+# 80 block9_sepconv2
+# 81 block9_sepconv2_bn
+# 82 block9_sepconv3_act
+# 83 block9_sepconv3
+# 84 block9_sepconv3_bn
+# 85 add_7
+# 86 block10_sepconv1_act
+# 87 block10_sepconv1
+# 88 block10_sepconv1_bn
+# 89 block10_sepconv2_act
+# 90 block10_sepconv2
+# 91 block10_sepconv2_bn
+# 92 block10_sepconv3_act
+# 93 block10_sepconv3
+# 94 block10_sepconv3_bn
+# 95 add_8
+# 96 block11_sepconv1_act
+# 97 block11_sepconv1
+# 98 block11_sepconv1_bn
+# 99 block11_sepconv2_act
+# 100 block11_sepconv2
+# 101 block11_sepconv2_bn
+# 102 block11_sepconv3_act
+# 103 block11_sepconv3
+# 104 block11_sepconv3_bn
+# 105 add_9
+# 106 block12_sepconv1_act
+# 107 block12_sepconv1
+# 108 block12_sepconv1_bn
+# 109 block12_sepconv2_act
+# 110 block12_sepconv2
+# 111 block12_sepconv2_bn
+# 112 block12_sepconv3_act
+# 113 block12_sepconv3
+# 114 block12_sepconv3_bn
+# 115 add_10
+# 116 block13_sepconv1_act
+# 117 block13_sepconv1
+# 118 block13_sepconv1_bn
+# 119 block13_sepconv2_act
+# 120 block13_sepconv2
+# 121 block13_sepconv2_bn
+# 122 conv2d_3
+# 123 block13_pool
+# 124 batch_normalization_3
+# 125 add_11
+# 126 block14_sepconv1
+# 127 block14_sepconv1_bn
+# 128 block14_sepconv1_act
+# 129 block14_sepconv2
+# 130 block14_sepconv2_bn
+# 131 block14_sepconv2_act
+# freezing the base layers at beginning of training
+for layer in base_model.layers:
+    layer.trainable = False
 
+optimizer = keras.optimizers.SGD(lr=0.2, momentum=0.9, decay=0.01)
+model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer, metrics=["accuracy"])
+history = model.fit(train_set,
+                    steps_per_epoch=int(0.75 * dataset_size / batch_size),
+                    validation_data=valid_set,
+                    validation_steps=int(0.15 * dataset_size / batch_size),
+                    epochs=5)
 
+# unfreezing to train all weights in all layers
 
+for layer in base_model.layers:
+    layer.trainable = True
 
-
-
-
+optimizer = keras.optimizers.SGD(learning_rate=0.01, momentum=0.9,
+                                 nesterov=True, decay=0.001)
+model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer,
+              metrics=["accuracy"])
+history = model.fit(train_set,
+                    steps_per_epoch=int(0.75 * dataset_size / batch_size),
+                    validation_data=valid_set,
+                    validation_steps=int(0.15 * dataset_size / batch_size),
+                    epochs=40)
