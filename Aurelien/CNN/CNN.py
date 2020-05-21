@@ -428,7 +428,7 @@ history = model.fit(train_set,
                     validation_data=valid_set,
                     validation_steps=int(0.15 * dataset_size / batch_size),
                     epochs=5)
-
+# loss: 0.0687 - accuracy: 0.9738 - val_loss: 0.6433 - val_accuracy: 0.8695
 # unfreezing to train all weights in all layers
 
 for layer in base_model.layers:
@@ -443,3 +443,4 @@ history = model.fit(train_set,
                     validation_data=valid_set,
                     validation_steps=int(0.15 * dataset_size / batch_size),
                     epochs=40)
+# loss: 0.0019 - accuracy: 0.9996 - val_loss: 0.3515 - val_accuracy: 0.9320
