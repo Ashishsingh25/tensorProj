@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
+from tensorflow.keras.layers import LayerNormalization
 
 def generate_time_series(batch_size, n_steps):
     freq1, freq2, offsets1, offsets2 = np.random.rand(4, batch_size, 1)
@@ -25,12 +26,12 @@ def plot_series(series, y=None, y_pred=None, x_label="$t$", y_label="$x(t)$"):
     plt.hlines(0, 0, 100, linewidth=1)
     plt.axis([0, n_steps + 1, -1, 1])
 
-np.random.seed(42)
-n_steps = 50
-series = generate_time_series(10000, n_steps + 1)
-X_train, y_train = series[:7000, :n_steps], series[:7000, -1]
-X_valid, y_valid = series[7000:9000, :n_steps], series[7000:9000, -1]
-X_test, y_test = series[9000:, :n_steps], series[9000:, -1]
+# np.random.seed(42)
+# n_steps = 50
+# series = generate_time_series(10000, n_steps + 1)
+# X_train, y_train = series[:7000, :n_steps], series[:7000, -1]
+# X_valid, y_valid = series[7000:9000, :n_steps], series[7000:9000, -1]
+# X_test, y_test = series[9000:, :n_steps], series[9000:, -1]
 # print(X_train.shape, y_train.shape)
 # (7000, 50, 1) (7000, 1)
 
@@ -194,38 +195,149 @@ Y_train = Y[:7000]
 Y_valid = Y[7000:9000]
 Y_test = Y[9000:]
 
-np.random.seed(42)
-tf.random.set_seed(42)
-model = keras.models.Sequential([
-    keras.layers.SimpleRNN(20, return_sequences=True, input_shape=[None, 1]),
-    keras.layers.SimpleRNN(20, return_sequences=True),
-    keras.layers.TimeDistributed(keras.layers.Dense(10))])
+# np.random.seed(42)
+# tf.random.set_seed(42)
+# model = keras.models.Sequential([
+#     keras.layers.SimpleRNN(20, return_sequences=True, input_shape=[None, 1]),
+#     keras.layers.SimpleRNN(20, return_sequences=True),
+#     keras.layers.TimeDistributed(keras.layers.Dense(10))])
 
 def last_time_step_mse(Y_true, Y_pred):
     return keras.metrics.mean_squared_error(Y_true[:, -1], Y_pred[:, -1])
 
-model.compile(loss="mse", optimizer=keras.optimizers.Adam(lr=0.01), metrics=[last_time_step_mse])
-history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
+# model.compile(loss="mse", optimizer=keras.optimizers.Adam(lr=0.01), metrics=[last_time_step_mse])
+# history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
 # loss: 0.0182 - last_time_step_mse: 0.0065 - val_loss: 0.0188 - val_last_time_step_mse: 0.0077
 
+# np.random.seed(43)
+# series = generate_time_series(1, 50 + 10)
+# X_new, Y_new = series[:, :50, :], series[:, 50:, :]
+# Y_pred = model.predict(X_new)[:, -1][..., np.newaxis]
+# print(tf.concat((Y_pred, Y_new), axis=2))
+# # tf.Tensor(
+# # [[[ 0.5302257   0.64557177]
+# #   [ 0.61683655  0.6562027 ]
+# #   [ 0.6010575   0.65506256]
+# #   [ 0.5211494   0.5576619 ]
+# #   [ 0.38858134  0.39075595]
+# #   [ 0.23027211  0.19883814]
+# #   [ 0.08102068 -0.0130802 ]
+# #   [-0.03815448 -0.15594868]
+# #   [-0.1189469  -0.18422735]
+# #   [-0.17355414 -0.2669426 ]]], shape=(1, 10, 2), dtype=float32)
+# plot_multiple_forecasts(X_new, Y_new, Y_pred)
+# plt.show()
+
+### Batch Norm
+
+# np.random.seed(42)
+# tf.random.set_seed(42)
+# model = keras.models.Sequential([
+#     keras.layers.SimpleRNN(20, return_sequences=True, input_shape=[None, 1]),
+#     keras.layers.BatchNormalization(),
+#     keras.layers.SimpleRNN(20, return_sequences=True),
+#     keras.layers.BatchNormalization(),
+#     keras.layers.TimeDistributed(keras.layers.Dense(10))])
+#
+# model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
+# history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
+# loss: 0.0282 - last_time_step_mse: 0.0162 - val_loss: 0.0323 - val_last_time_step_mse: 0.0214
+
+### Layer Norm
+
+# class LNSimpleRNNCell(keras.layers.Layer):
+#     def __init__(self, units, activation="tanh", **kwargs):
+#         super().__init__(**kwargs)
+#         self.state_size = units
+#         self.output_size = units
+#         self.simple_rnn_cell = keras.layers.SimpleRNNCell(units,
+#                                                           activation=None)
+#         self.layer_norm = LayerNormalization()
+#         self.activation = keras.activations.get(activation)
+#     def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
+#         if inputs is not None:
+#             batch_size = tf.shape(inputs)[0]
+#             dtype = inputs.dtype
+#         return [tf.zeros([batch_size, self.state_size], dtype=dtype)]
+#     def call(self, inputs, states):
+#         outputs, new_states = self.simple_rnn_cell(inputs, states)
+#         norm_outputs = self.activation(self.layer_norm(outputs))
+#         return norm_outputs, [norm_outputs]
+#
+np.random.seed(42)
+tf.random.set_seed(42)
+# model = keras.models.Sequential([
+#     keras.layers.RNN(LNSimpleRNNCell(20), return_sequences=True,
+#                      input_shape=[None, 1]),
+#     keras.layers.RNN(LNSimpleRNNCell(20), return_sequences=True),
+#     keras.layers.TimeDistributed(keras.layers.Dense(10))])
+#
+# model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
+# history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
+# loss: 0.0273 - last_time_step_mse: 0.0149 - val_loss: 0.0268 - val_last_time_step_mse: 0.0141
+
+### LSTMs
+
+# model = keras.models.Sequential([
+#     keras.layers.LSTM(20, return_sequences=True, input_shape=[None, 1]),
+#     keras.layers.LSTM(20, return_sequences=True),
+#     keras.layers.TimeDistributed(keras.layers.Dense(10))])
+#
+# model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
+# history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
+# # loss: 0.0239 - last_time_step_mse: 0.0089 - val_loss: 0.0240 - val_last_time_step_mse: 0.0086
+# print(model.evaluate(X_valid, Y_valid))
+# # [0.02401665359735489, 0.008551412]
+# np.random.seed(43)
+# series = generate_time_series(1, 50 + 10)
+# X_new, Y_new = series[:, :50, :], series[:, 50:, :]
+# Y_pred = model.predict(X_new)[:, -1][..., np.newaxis]
+# # print(tf.concat((Y_pred, Y_new), axis=2))
+# # tf.Tensor(
+# # [[[ 0.54658085  0.64557177]
+# #   [ 0.6022002   0.6562027 ]
+# #   [ 0.5455934   0.65506256]
+# #   [ 0.4606139   0.5576619 ]
+# #   [ 0.33550242  0.39075595]
+# #   [ 0.20063888  0.19883814]
+# #   [ 0.08716021 -0.0130802 ]
+# #   [-0.01352238 -0.15594868]
+# #   [-0.10610919 -0.18422735]
+# #   [-0.18007736 -0.2669426 ]]], shape=(1, 10, 2), dtype=float32)
+# plot_multiple_forecasts(X_new, Y_new, Y_pred)
+# plt.show()
+
+### GRU
+
+model = keras.models.Sequential([
+    keras.layers.GRU(20, return_sequences=True, input_shape=[None, 1]),
+    keras.layers.GRU(20, return_sequences=True),
+    keras.layers.TimeDistributed(keras.layers.Dense(10))])
+
+model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
+history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
+# loss: 0.0242 - last_time_step_mse: 0.0106 - val_loss: 0.0241 - val_last_time_step_mse: 0.0103
+print(model.evaluate(X_valid, Y_valid))
+# [0.024071006283164026, 0.010298316]
 np.random.seed(43)
 series = generate_time_series(1, 50 + 10)
 X_new, Y_new = series[:, :50, :], series[:, 50:, :]
 Y_pred = model.predict(X_new)[:, -1][..., np.newaxis]
 print(tf.concat((Y_pred, Y_new), axis=2))
 # tf.Tensor(
-# [[[ 0.5302257   0.64557177]
-#   [ 0.61683655  0.6562027 ]
-#   [ 0.6010575   0.65506256]
-#   [ 0.5211494   0.5576619 ]
-#   [ 0.38858134  0.39075595]
-#   [ 0.23027211  0.19883814]
-#   [ 0.08102068 -0.0130802 ]
-#   [-0.03815448 -0.15594868]
-#   [-0.1189469  -0.18422735]
-#   [-0.17355414 -0.2669426 ]]], shape=(1, 10, 2), dtype=float32)
+# [[[ 0.59997356  0.64557177]
+#   [ 0.5988938   0.6562027 ]
+#   [ 0.5366406   0.65506256]
+#   [ 0.46059778  0.5576619 ]
+#   [ 0.35147652  0.39075595]
+#   [ 0.24302815  0.19883814]
+#   [ 0.1510677  -0.0130802 ]
+#   [ 0.04900258 -0.15594868]
+#   [-0.06261393 -0.18422735]
+#   [-0.1516203  -0.2669426 ]]], shape=(1, 10, 2), dtype=float32)
 plot_multiple_forecasts(X_new, Y_new, Y_pred)
 plt.show()
+
 
 
 
