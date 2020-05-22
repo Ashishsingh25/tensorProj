@@ -309,37 +309,54 @@ tf.random.set_seed(42)
 
 ### GRU
 
-model = keras.models.Sequential([
-    keras.layers.GRU(20, return_sequences=True, input_shape=[None, 1]),
-    keras.layers.GRU(20, return_sequences=True),
-    keras.layers.TimeDistributed(keras.layers.Dense(10))])
+# model = keras.models.Sequential([
+#     keras.layers.GRU(20, return_sequences=True, input_shape=[None, 1]),
+#     keras.layers.GRU(20, return_sequences=True),
+#     keras.layers.TimeDistributed(keras.layers.Dense(10))])
+#
+# model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
+# history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
+# # loss: 0.0242 - last_time_step_mse: 0.0106 - val_loss: 0.0241 - val_last_time_step_mse: 0.0103
+# print(model.evaluate(X_valid, Y_valid))
+# # [0.024071006283164026, 0.010298316]
+# np.random.seed(43)
+# series = generate_time_series(1, 50 + 10)
+# X_new, Y_new = series[:, :50, :], series[:, 50:, :]
+# Y_pred = model.predict(X_new)[:, -1][..., np.newaxis]
+# print(tf.concat((Y_pred, Y_new), axis=2))
+# # tf.Tensor(
+# # [[[ 0.59997356  0.64557177]
+# #   [ 0.5988938   0.6562027 ]
+# #   [ 0.5366406   0.65506256]
+# #   [ 0.46059778  0.5576619 ]
+# #   [ 0.35147652  0.39075595]
+# #   [ 0.24302815  0.19883814]
+# #   [ 0.1510677  -0.0130802 ]
+# #   [ 0.04900258 -0.15594868]
+# #   [-0.06261393 -0.18422735]
+# #   [-0.1516203  -0.2669426 ]]], shape=(1, 10, 2), dtype=float32)
+# plot_multiple_forecasts(X_new, Y_new, Y_pred)
+# plt.show()
 
+### 1D Convolutional Layers
+
+# model = keras.models.Sequential([
+#     keras.layers.Conv1D(filters=20, kernel_size=4, strides=2, padding="valid", input_shape=[None, 1]),
+#     keras.layers.GRU(20, return_sequences=True),
+#     keras.layers.GRU(20, return_sequences=True),
+#     keras.layers.TimeDistributed(keras.layers.Dense(10))])
+#
+# model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
+# history = model.fit(X_train, Y_train[:, 3::2], epochs=20, validation_data=(X_valid, Y_valid[:, 3::2]))
+# loss: 0.0175 - last_time_step_mse: 0.0072 - val_loss: 0.0173 - val_last_time_step_mse: 0.0067
+
+### WaveNet
+
+model = keras.models.Sequential()
+model.add(keras.layers.InputLayer(input_shape=[None, 1]))
+for rate in (1, 2, 4, 8) * 2:
+    model.add(keras.layers.Conv1D(filters=20, kernel_size=2, padding="causal", activation="relu", dilation_rate=rate))
+model.add(keras.layers.Conv1D(filters=10, kernel_size=1))
 model.compile(loss="mse", optimizer="adam", metrics=[last_time_step_mse])
 history = model.fit(X_train, Y_train, epochs=20, validation_data=(X_valid, Y_valid))
-# loss: 0.0242 - last_time_step_mse: 0.0106 - val_loss: 0.0241 - val_last_time_step_mse: 0.0103
-print(model.evaluate(X_valid, Y_valid))
-# [0.024071006283164026, 0.010298316]
-np.random.seed(43)
-series = generate_time_series(1, 50 + 10)
-X_new, Y_new = series[:, :50, :], series[:, 50:, :]
-Y_pred = model.predict(X_new)[:, -1][..., np.newaxis]
-print(tf.concat((Y_pred, Y_new), axis=2))
-# tf.Tensor(
-# [[[ 0.59997356  0.64557177]
-#   [ 0.5988938   0.6562027 ]
-#   [ 0.5366406   0.65506256]
-#   [ 0.46059778  0.5576619 ]
-#   [ 0.35147652  0.39075595]
-#   [ 0.24302815  0.19883814]
-#   [ 0.1510677  -0.0130802 ]
-#   [ 0.04900258 -0.15594868]
-#   [-0.06261393 -0.18422735]
-#   [-0.1516203  -0.2669426 ]]], shape=(1, 10, 2), dtype=float32)
-plot_multiple_forecasts(X_new, Y_new, Y_pred)
-plt.show()
-
-
-
-
-
-
+# loss: 0.0198 - last_time_step_mse: 0.0081 - val_loss: 0.0197 - val_last_time_step_mse: 0.0080
