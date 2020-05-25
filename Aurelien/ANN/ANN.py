@@ -412,3 +412,4 @@ print(rnd_search_cv.score(X_test, y_test))
 model = rnd_search_cv.best_estimator_.model
 print(model)
 print(model.evaluate(X_test, y_test))
+
