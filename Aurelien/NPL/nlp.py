@@ -267,3 +267,22 @@ import numpy as np
 # history = model.fit(train_set, steps_per_epoch=train_size // 32, epochs=5)
 # # loss: 0.0996 - accuracy: 0.9656
 
+# Bidirectional Recurrent Layers
+
+model = keras.models.Sequential([
+    keras.layers.GRU(10, return_sequences=True, input_shape=[None, 10]),
+    keras.layers.Bidirectional(keras.layers.GRU(10, return_sequences=True))])
+
+print(model.summary())
+# Model: "sequential"
+# _________________________________________________________________
+# Layer (type)                 Output Shape              Param #
+# =================================================================
+# gru (GRU)                    (None, None, 10)          660
+# _________________________________________________________________
+# bidirectional (Bidirectional (None, None, 20)          1320
+# =================================================================
+# Total params: 1,980
+# Trainable params: 1,980
+# Non-trainable params: 0
+
