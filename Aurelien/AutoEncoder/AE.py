@@ -279,33 +279,137 @@ def show_reconstructions(model, images=X_valid, n_images=5):
 
 # KL Divergence loss
 
-K = keras.backend
-kl_divergence = keras.losses.kullback_leibler_divergence
-class KLDivergenceRegularizer(keras.regularizers.Regularizer):
-    def __init__(self, weight, target=0.1):
-        self.weight = weight
-        self.target = target
-    def __call__(self, inputs):
-        mean_activities = K.mean(inputs, axis=0)
-        return self.weight * (
-            kl_divergence(self.target, mean_activities) +
-            kl_divergence(1. - self.target, 1. - mean_activities))
+# K = keras.backend
+# kl_divergence = keras.losses.kullback_leibler_divergence
+# class KLDivergenceRegularizer(keras.regularizers.Regularizer):
+#     def __init__(self, weight, target=0.1):
+#         self.weight = weight
+#         self.target = target
+#     def __call__(self, inputs):
+#         mean_activities = K.mean(inputs, axis=0)
+#         return self.weight * (
+#             kl_divergence(self.target, mean_activities) +
+#             kl_divergence(1. - self.target, 1. - mean_activities))
+#
+# tf.random.set_seed(42)
+# np.random.seed(42)
+# kld_reg = KLDivergenceRegularizer(weight=0.05, target=0.1)
+# sparse_kl_encoder = keras.models.Sequential([
+#     keras.layers.Flatten(input_shape=[28, 28]),
+#     keras.layers.Dense(100, activation="selu"),
+#     keras.layers.Dense(300, activation="sigmoid", activity_regularizer=kld_reg)])
+#
+# sparse_kl_decoder = keras.models.Sequential([
+#     keras.layers.Dense(100, activation="selu", input_shape=[300]),
+#     keras.layers.Dense(28 * 28, activation="sigmoid"),
+#     keras.layers.Reshape([28, 28])])
+# sparse_kl_ae = keras.models.Sequential([sparse_kl_encoder, sparse_kl_decoder])
+# sparse_kl_ae.compile(loss="binary_crossentropy", optimizer=keras.optimizers.SGD(lr=1.0), metrics=[rounded_accuracy])
+# history = sparse_kl_ae.fit(X_train, X_train, epochs=20, validation_data=(X_valid, X_valid))
+# # loss: 0.2928 - rounded_accuracy: 0.9277 - val_loss: 0.2942 - val_rounded_accuracy: 0.9280
+# show_reconstructions(sparse_kl_ae)
+# plt.show()
+
+### GAN
+
+def plot_multiple_images(images, n_cols=None):
+    n_cols = n_cols or len(images)
+    n_rows = (len(images) - 1) // n_cols + 1
+    if images.shape[-1] == 1:
+        images = np.squeeze(images, axis=-1)
+    plt.figure(figsize=(n_cols, n_rows))
+    for index, image in enumerate(images):
+        plt.subplot(n_rows, n_cols, index + 1)
+        plt.imshow(image, cmap="binary")
+        plt.axis("off")
+
+# np.random.seed(42)
+# tf.random.set_seed(42)
+# codings_size = 30
+# generator = keras.models.Sequential([
+#     keras.layers.Dense(100, activation="selu", input_shape=[codings_size]),
+#     keras.layers.Dense(150, activation="selu"),
+#     keras.layers.Dense(28 * 28, activation="sigmoid"),
+#     keras.layers.Reshape([28, 28])])
+# discriminator = keras.models.Sequential([
+#     keras.layers.Flatten(input_shape=[28, 28]),
+#     keras.layers.Dense(150, activation="selu"),
+#     keras.layers.Dense(100, activation="selu"),
+#     keras.layers.Dense(1, activation="sigmoid")])
+# gan = keras.models.Sequential([generator, discriminator])
+
+# discriminator.compile(loss="binary_crossentropy", optimizer="rmsprop")
+# discriminator.trainable = False
+# gan.compile(loss="binary_crossentropy", optimizer="rmsprop")
+
+# batch_size = 32
+# dataset = tf.data.Dataset.from_tensor_slices(X_train).shuffle(1000)
+# dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(1)
+
+def train_gan(gan, dataset, batch_size, codings_size, n_epochs=50):
+    generator, discriminator = gan.layers
+    for epoch in range(n_epochs):
+        print("Epoch {}/{}".format(epoch + 1, n_epochs))              # not shown in the book
+        for X_batch in dataset:
+            # phase 1 - training the discriminator
+            noise = tf.random.normal(shape=[batch_size, codings_size])
+            generated_images = generator(noise)
+            X_fake_and_real = tf.concat([generated_images, X_batch], axis=0)
+            y1 = tf.constant([[0.]] * batch_size + [[1.]] * batch_size)
+            discriminator.trainable = True
+            discriminator.train_on_batch(X_fake_and_real, y1)
+            # phase 2 - training the generator
+            noise = tf.random.normal(shape=[batch_size, codings_size])
+            y2 = tf.constant([[1.]] * batch_size)
+            discriminator.trainable = False
+            gan.train_on_batch(noise, y2)
+        # plot_multiple_images(generated_images, 8)                     # not shown
+        # plt.show()
+
+# train_gan(gan, dataset, batch_size, codings_size, n_epochs=1)
+# noise = tf.random.normal(shape=[batch_size, codings_size])
+# generated_images = generator(noise)
+# plot_multiple_images(generated_images, 8)
+# plt.show()
+# train_gan(gan, dataset, batch_size, codings_size)
+
+### DCGAN
 
 tf.random.set_seed(42)
 np.random.seed(42)
-kld_reg = KLDivergenceRegularizer(weight=0.05, target=0.1)
-sparse_kl_encoder = keras.models.Sequential([
-    keras.layers.Flatten(input_shape=[28, 28]),
-    keras.layers.Dense(100, activation="selu"),
-    keras.layers.Dense(300, activation="sigmoid", activity_regularizer=kld_reg)])
+codings_size = 100
+generator = keras.models.Sequential([
+    keras.layers.Dense(7 * 7 * 128, input_shape=[codings_size]),
+    keras.layers.Reshape([7, 7, 128]),
+    keras.layers.BatchNormalization(),
+    keras.layers.Conv2DTranspose(64, kernel_size=5, strides=2, padding="SAME", activation="selu"),
+    keras.layers.BatchNormalization(),
+    keras.layers.Conv2DTranspose(1, kernel_size=5, strides=2, padding="SAME", activation="tanh")])
 
-sparse_kl_decoder = keras.models.Sequential([
-    keras.layers.Dense(100, activation="selu", input_shape=[300]),
-    keras.layers.Dense(28 * 28, activation="sigmoid"),
-    keras.layers.Reshape([28, 28])])
-sparse_kl_ae = keras.models.Sequential([sparse_kl_encoder, sparse_kl_decoder])
-sparse_kl_ae.compile(loss="binary_crossentropy", optimizer=keras.optimizers.SGD(lr=1.0), metrics=[rounded_accuracy])
-history = sparse_kl_ae.fit(X_train, X_train, epochs=20, validation_data=(X_valid, X_valid))
-# loss: 0.2928 - rounded_accuracy: 0.9277 - val_loss: 0.2942 - val_rounded_accuracy: 0.9280
-show_reconstructions(sparse_kl_ae)
+discriminator = keras.models.Sequential([
+    keras.layers.Conv2D(64, kernel_size=5, strides=2, padding="SAME", activation=keras.layers.LeakyReLU(0.2),
+                        input_shape=[28, 28, 1]),
+    keras.layers.Dropout(0.4),
+    keras.layers.Conv2D(128, kernel_size=5, strides=2, padding="SAME", activation=keras.layers.LeakyReLU(0.2)),
+    keras.layers.Dropout(0.4),
+    keras.layers.Flatten(),
+    keras.layers.Dense(1, activation="sigmoid")])
+gan = keras.models.Sequential([generator, discriminator])
+
+discriminator.compile(loss="binary_crossentropy", optimizer="rmsprop")
+discriminator.trainable = False
+gan.compile(loss="binary_crossentropy", optimizer="rmsprop")
+
+X_train_dcgan = X_train.reshape(-1, 28, 28, 1) * 2. - 1. # reshape and rescale
+batch_size = 32
+dataset = tf.data.Dataset.from_tensor_slices(X_train_dcgan)
+dataset = dataset.shuffle(1000)
+dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(1)
+
+train_gan(gan, dataset, batch_size, codings_size)
+noise = tf.random.normal(shape=[batch_size, codings_size])
+generated_images = generator(noise)
+plot_multiple_images(generated_images, 8)
 plt.show()
+
+
