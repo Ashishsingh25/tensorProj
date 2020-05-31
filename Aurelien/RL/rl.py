@@ -213,6 +213,98 @@ def render_policy_net(model, n_max_steps=200, seed=42):
 # # Iteration: 149, mean rewards: 178.3
 # model.save("CP_PolicyGrad_model.h5")
 
-model = keras.models.load_model("CP_PolicyGrad_model.h5")
-render_policy_net(model)
+# model = keras.models.load_model("CP_PolicyGrad_model.h5")
+# render_policy_net(model)
 # Reward:  180
+
+### MDP
+
+
+transition_probabilities = [ # shape=[s, a, s']
+        [[0.7, 0.3, 0.0], [1.0, 0.0, 0.0], [0.8, 0.2, 0.0]],
+        [[0.0, 1.0, 0.0], None, [0.0, 0.0, 1.0]],
+        [None, [0.8, 0.1, 0.1], None]]
+rewards = [ # shape=[s, a, s']
+        [[+10, 0, 0], [0, 0, 0], [0, 0, 0]],
+        [[0, 0, 0], [0, 0, 0], [0, 0, -50]],
+        [[0, 0, 0], [+40, 0, 0], [0, 0, 0]]]
+possible_actions = [[0, 1, 2], [0, 2], [1]]
+
+# Q_values = np.full((3, 3), -np.inf) # -np.inf for impossible actions
+# for state, actions in enumerate(possible_actions):
+#     Q_values[state, actions] = 0.0  # for all possible actions
+
+# with gamma 0.9
+# gamma = 0.90  # the discount factor
+# for iteration in range(50):
+#     Q_prev = Q_values.copy()
+#     for s in range(3):
+#         for a in possible_actions[s]:
+#             Q_values[s, a] = np.sum([
+#                     transition_probabilities[s][a][sp]
+#                     * (rewards[s][a][sp] + gamma * np.max(Q_prev[sp]))
+#                 for sp in range(3)])
+
+# print(Q_values)
+# [[18.91891892 17.02702702 13.62162162]
+#  [ 0.                -inf -4.87971488]
+#  [       -inf 50.13365013        -inf]]
+# print(np.argmax(Q_values, axis=1))
+# [0 0 1]
+# with gamma 0.95
+
+# Q_values = np.full((3, 3), -np.inf) # -np.inf for impossible actions
+# for state, actions in enumerate(possible_actions):
+#     Q_values[state, actions] = 0.0  # for all possible actions
+#
+# gamma = 0.95  # the discount factor
+# for iteration in range(50):
+#     Q_prev = Q_values.copy()
+#     for s in range(3):
+#         for a in possible_actions[s]:
+#             Q_values[s, a] = np.sum([
+#                     transition_probabilities[s][a][sp]
+#                     * (rewards[s][a][sp] + gamma * np.max(Q_prev[sp]))
+#                 for sp in range(3)])
+# print(Q_values)
+# [[21.73304188 20.63807938 16.70138772]
+#  [ 0.95462106        -inf  1.01361207]
+#  [       -inf 53.70728682        -inf]]
+# print(np.argmax(Q_values, axis=1))
+# [0 2 1]
+
+### Q-Learning
+
+def step(state, action):
+    probas = transition_probabilities[state][action]
+    next_state = np.random.choice([0, 1, 2], p=probas)
+    reward = rewards[state][action][next_state]
+    return next_state, reward
+
+def exploration_policy(state):
+    return np.random.choice(possible_actions[state])
+
+np.random.seed(42)
+Q_values = np.full((3, 3), -np.inf)
+for state, actions in enumerate(possible_actions):
+    Q_values[state][actions] = 0
+
+alpha0 = 0.05 # initial learning rate
+decay = 0.005 # learning rate decay
+gamma = 0.90 # discount factor
+state = 0 # initial state
+for iteration in range(10000):
+    action = exploration_policy(state)
+    next_state, reward = step(state, action)
+    next_value = np.max(Q_values[next_state]) # greedy policy at the next step
+    alpha = alpha0 / (1 + iteration * decay)
+    Q_values[state, action] *= 1 - alpha
+    Q_values[state, action] += alpha * (reward + gamma * next_value)
+    state = next_state
+# print(Q_values)
+# [[18.77621289 17.2238872  13.74543343]
+#  [ 0.                -inf -8.00485647]
+#  [       -inf 49.40208921        -inf]]
+# print(np.argmax(Q_values, axis=1)) # optimal action for each state
+# [0 0 1]
+
