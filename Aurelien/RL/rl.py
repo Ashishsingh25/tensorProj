@@ -275,36 +275,38 @@ possible_actions = [[0, 1, 2], [0, 2], [1]]
 
 ### Q-Learning
 
-def step(state, action):
-    probas = transition_probabilities[state][action]
-    next_state = np.random.choice([0, 1, 2], p=probas)
-    reward = rewards[state][action][next_state]
-    return next_state, reward
-
-def exploration_policy(state):
-    return np.random.choice(possible_actions[state])
-
-np.random.seed(42)
-Q_values = np.full((3, 3), -np.inf)
-for state, actions in enumerate(possible_actions):
-    Q_values[state][actions] = 0
-
-alpha0 = 0.05 # initial learning rate
-decay = 0.005 # learning rate decay
-gamma = 0.90 # discount factor
-state = 0 # initial state
-for iteration in range(10000):
-    action = exploration_policy(state)
-    next_state, reward = step(state, action)
-    next_value = np.max(Q_values[next_state]) # greedy policy at the next step
-    alpha = alpha0 / (1 + iteration * decay)
-    Q_values[state, action] *= 1 - alpha
-    Q_values[state, action] += alpha * (reward + gamma * next_value)
-    state = next_state
+# def step(state, action):
+#     probas = transition_probabilities[state][action]
+#     next_state = np.random.choice([0, 1, 2], p=probas)
+#     reward = rewards[state][action][next_state]
+#     return next_state, reward
+#
+# def exploration_policy(state):
+#     return np.random.choice(possible_actions[state])
+#
+# np.random.seed(42)
+# Q_values = np.full((3, 3), -np.inf)
+# for state, actions in enumerate(possible_actions):
+#     Q_values[state][actions] = 0
+#
+# alpha0 = 0.05 # initial learning rate
+# decay = 0.005 # learning rate decay
+# gamma = 0.90 # discount factor
+# state = 0 # initial state
+# for iteration in range(10000):
+#     action = exploration_policy(state)
+#     next_state, reward = step(state, action)
+#     next_value = np.max(Q_values[next_state]) # greedy policy at the next step
+#     alpha = alpha0 / (1 + iteration * decay)
+#     Q_values[state, action] *= 1 - alpha
+#     Q_values[state, action] += alpha * (reward + gamma * next_value)
+#     state = next_state
 # print(Q_values)
 # [[18.77621289 17.2238872  13.74543343]
 #  [ 0.                -inf -8.00485647]
 #  [       -inf 49.40208921        -inf]]
 # print(np.argmax(Q_values, axis=1)) # optimal action for each state
 # [0 0 1]
+
+### DQN
 
