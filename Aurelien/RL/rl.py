@@ -4,6 +4,7 @@ import numpy as np
 from tensorflow import keras
 import tensorflow as tf
 from collections import deque
+from tf_agents.environments import suite_gym
 
 # env = gym.make('CartPole-v1')
 # env.seed(42)
@@ -220,15 +221,15 @@ from collections import deque
 
 ### MDP
 
-transition_probabilities = [ # shape=[s, a, s']
-        [[0.7, 0.3, 0.0], [1.0, 0.0, 0.0], [0.8, 0.2, 0.0]],
-        [[0.0, 1.0, 0.0], None, [0.0, 0.0, 1.0]],
-        [None, [0.8, 0.1, 0.1], None]]
-rewards = [ # shape=[s, a, s']
-        [[+10, 0, 0], [0, 0, 0], [0, 0, 0]],
-        [[0, 0, 0], [0, 0, 0], [0, 0, -50]],
-        [[0, 0, 0], [+40, 0, 0], [0, 0, 0]]]
-possible_actions = [[0, 1, 2], [0, 2], [1]]
+# transition_probabilities = [ # shape=[s, a, s']
+#         [[0.7, 0.3, 0.0], [1.0, 0.0, 0.0], [0.8, 0.2, 0.0]],
+#         [[0.0, 1.0, 0.0], None, [0.0, 0.0, 1.0]],
+#         [None, [0.8, 0.1, 0.1], None]]
+# rewards = [ # shape=[s, a, s']
+#         [[+10, 0, 0], [0, 0, 0], [0, 0, 0]],
+#         [[0, 0, 0], [0, 0, 0], [0, 0, -50]],
+#         [[0, 0, 0], [+40, 0, 0], [0, 0, 0]]]
+# possible_actions = [[0, 1, 2], [0, 2], [1]]
 
 # Q_values = np.full((3, 3), -np.inf) # -np.inf for impossible actions
 # for state, actions in enumerate(possible_actions):
@@ -310,44 +311,44 @@ possible_actions = [[0, 1, 2], [0, 2], [1]]
 
 ### DQN
 
-keras.backend.clear_session()
-env = gym.make("CartPole-v1")
-env.seed(42)
-np.random.seed(42)
-tf.random.set_seed(42)
-input_shape = [4] # == env.observation_space.shape
-n_outputs = 2 # == env.action_space.n
-model = keras.models.Sequential([
-    keras.layers.Dense(32, activation="elu", input_shape=input_shape),
-    keras.layers.Dense(32, activation="elu"),
-    keras.layers.Dense(n_outputs)])
+# keras.backend.clear_session()
+# env = gym.make("CartPole-v1")
+# env.seed(42)
+# np.random.seed(42)
+# tf.random.set_seed(42)
+# input_shape = [4] # == env.observation_space.shape
+# n_outputs = 2 # == env.action_space.n
+# model = keras.models.Sequential([
+#     keras.layers.Dense(32, activation="elu", input_shape=input_shape),
+#     keras.layers.Dense(32, activation="elu"),
+#     keras.layers.Dense(n_outputs)])
 
-def epsilon_greedy_policy(state, epsilon=0):
-    if np.random.rand() < epsilon:
-        return np.random.randint(2)
-    else:
-        Q_values = model.predict(state[np.newaxis])
-        return np.argmax(Q_values[0])
+# def epsilon_greedy_policy(state, epsilon=0):
+#     if np.random.rand() < epsilon:
+#         return np.random.randint(2)
+#     else:
+#         Q_values = model.predict(state[np.newaxis])
+#         return np.argmax(Q_values[0])
+#
+# # replay_memory = deque(maxlen=2000)
+# def sample_experiences(batch_size):
+#     indices = np.random.randint(len(replay_memory), size=batch_size)
+#     batch = [replay_memory[index] for index in indices]
+#     states, actions, rewards, next_states, dones = [
+#         np.array([experience[field_index] for experience in batch])
+#         for field_index in range(5)]
+#     return states, actions, rewards, next_states, dones
+#
+# def play_one_step(env, state, epsilon):
+#     action = epsilon_greedy_policy(state, epsilon)
+#     next_state, reward, done, info = env.step(action)
+#     replay_memory.append((state, action, reward, next_state, done))
+#     return next_state, reward, done, info
 
-replay_memory = deque(maxlen=2000)
-def sample_experiences(batch_size):
-    indices = np.random.randint(len(replay_memory), size=batch_size)
-    batch = [replay_memory[index] for index in indices]
-    states, actions, rewards, next_states, dones = [
-        np.array([experience[field_index] for experience in batch])
-        for field_index in range(5)]
-    return states, actions, rewards, next_states, dones
-
-def play_one_step(env, state, epsilon):
-    action = epsilon_greedy_policy(state, epsilon)
-    next_state, reward, done, info = env.step(action)
-    replay_memory.append((state, action, reward, next_state, done))
-    return next_state, reward, done, info
-
-batch_size = 32
-discount_rate = 0.95
-optimizer = keras.optimizers.Adam(lr=1e-3)
-loss_fn = keras.losses.mean_squared_error
+# batch_size = 32
+# discount_rate = 0.95
+# optimizer = keras.optimizers.Adam(lr=1e-3)
+# loss_fn = keras.losses.mean_squared_error
 
 # def training_step(batch_size):
 #     experiences = sample_experiences(batch_size)
@@ -386,32 +387,173 @@ loss_fn = keras.losses.mean_squared_error
 # plt.plot(rewards)
 # plt.show()
 
-model = keras.models.load_model("CP_DQN_model.h5")
-env.seed(43)
-state = env.reset()
-for step in range(1000):
-    action = epsilon_greedy_policy(state)
-    state, reward, done, info = env.step(action)
-    if done:
-        print()
-        print("Reward: ", step)
-        env.close()
-        break
-    env.render(mode="rgb_array")
+# model = keras.models.load_model("CP_DQN_model.h5")
+# env.seed(43)
+# state = env.reset()
+# for step in range(1000):
+#     action = epsilon_greedy_policy(state)
+#     state, reward, done, info = env.step(action)
+#     if done:
+#         print()
+#         print("Reward: ", step)
+#         env.close()
+#         break
+#     env.render(mode="rgb_array")
+# 499
 
+# Double DQN
 
+# keras.backend.clear_session()
+# tf.random.set_seed(42)
+# np.random.seed(42)
+# model = keras.models.Sequential([
+#     keras.layers.Dense(32, activation="elu", input_shape=[4]),
+#     keras.layers.Dense(32, activation="elu"),
+#     keras.layers.Dense(n_outputs)])
+# target = keras.models.clone_model(model)
+# target.set_weights(model.get_weights())
+#
+# batch_size = 32
+# discount_rate = 0.95
+# optimizer = keras.optimizers.Adam(lr=1e-3)
+# loss_fn = keras.losses.Huber()
+# def training_step(batch_size):
+#     experiences = sample_experiences(batch_size)
+#     states, actions, rewards, next_states, dones = experiences
+#     next_Q_values = model.predict(next_states)
+#     best_next_actions = np.argmax(next_Q_values, axis=1)
+#     next_mask = tf.one_hot(best_next_actions, n_outputs).numpy()
+#     next_best_Q_values = (target.predict(next_states) * next_mask).sum(axis=1)
+#     target_Q_values = (rewards + (1 - dones) * discount_rate * next_best_Q_values)
+#     target_Q_values = target_Q_values.reshape(-1, 1)
+#     mask = tf.one_hot(actions, n_outputs)
+#     with tf.GradientTape() as tape:
+#         all_Q_values = model(states)
+#         Q_values = tf.reduce_sum(all_Q_values * mask, axis=1, keepdims=True)
+#         loss = tf.reduce_mean(loss_fn(target_Q_values, Q_values))
+#     grads = tape.gradient(loss, model.trainable_variables)
+#     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+#
+# replay_memory = deque(maxlen=2000)
+# rewards = []
+# best_score = 0
+# for episode in range(1000):
+#     obs = env.reset()
+#     for step in range(200):
+#         epsilon = max(1 - episode / 500, 0.01)
+#         obs, reward, done, info = play_one_step(env, obs, epsilon)
+#         if done:
+#             break
+#     if episode > 50:
+#         training_step(batch_size)
+#     if episode % 50 == 0:
+#         target.set_weights(model.get_weights())
+#     rewards.append(step)
+#     if step > best_score:
+#         best_weights = model.get_weights()
+#         best_score = step
+#     print("\rEpisode: {}, Steps: {}, eps: {:.3f}".format(episode, step + 1, epsilon), end="")
+#
+# model.set_weights(best_weights)
+# model.save("CP_DDQN_model.h5")
+# plt.plot(rewards)
+# plt.show()
+#
+# env.seed(43)
+# state = env.reset()
+# for step in range(1000):
+#     action = epsilon_greedy_policy(state)
+#     state, reward, done, info = env.step(action)
+#     if done:
+#         print()
+#         print("Reward: ", step)
+#         env.close()
+#         break
+#     env.render(mode="rgb_array")
+# Reward:  376
 
+### Dueling Double DQN
 
+# keras.backend.clear_session()
+# tf.random.set_seed(42)
+# np.random.seed(42)
+#
+# K = keras.backend
+# input_states = keras.layers.Input(shape=[4])
+# hidden1 = keras.layers.Dense(32, activation="elu")(input_states)
+# hidden2 = keras.layers.Dense(32, activation="elu")(hidden1)
+# state_values = keras.layers.Dense(1)(hidden2)
+# raw_advantages = keras.layers.Dense(n_outputs)(hidden2)
+# advantages = raw_advantages - K.max(raw_advantages, axis=1, keepdims=True)
+# Q_values = state_values + advantages
+# model = keras.models.Model(inputs=[input_states], outputs=[Q_values])
+#
+# target = keras.models.clone_model(model)
+# target.set_weights(model.get_weights())
+#
+# batch_size = 32
+# discount_rate = 0.95
+# optimizer = keras.optimizers.Adam(lr=1e-2)
+# loss_fn = keras.losses.Huber()
+# def training_step(batch_size):
+#     experiences = sample_experiences(batch_size)
+#     states, actions, rewards, next_states, dones = experiences
+#     next_Q_values = model.predict(next_states)
+#     best_next_actions = np.argmax(next_Q_values, axis=1)
+#     next_mask = tf.one_hot(best_next_actions, n_outputs).numpy()
+#     next_best_Q_values = (target.predict(next_states) * next_mask).sum(axis=1)
+#     target_Q_values = (rewards + (1 - dones) * discount_rate * next_best_Q_values)
+#     target_Q_values = target_Q_values.reshape(-1, 1)
+#     mask = tf.one_hot(actions, n_outputs)
+#     with tf.GradientTape() as tape:
+#         all_Q_values = model(states)
+#         Q_values = tf.reduce_sum(all_Q_values * mask, axis=1, keepdims=True)
+#         loss = tf.reduce_mean(loss_fn(target_Q_values, Q_values))
+#     grads = tape.gradient(loss, model.trainable_variables)
+#     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+#
+# replay_memory = deque(maxlen=2000)
+# rewards = []
+# best_score = 0
+# for episode in range(1000):
+#     obs = env.reset()
+#     for step in range(200):
+#         epsilon = max(1 - episode / 500, 0.01)
+#         obs, reward, done, info = play_one_step(env, obs, epsilon)
+#         if done:
+#             break
+#     if episode > 50:
+#         training_step(batch_size)
+#     if episode % 200 == 0:
+#         target.set_weights(model.get_weights())
+#     rewards.append(step)
+#     if step > best_score:
+#         best_weights = model.get_weights()
+#         best_score = step
+#     print("\rEpisode: {}, Steps: {}, eps: {:.3f}".format(episode, step + 1, epsilon))
+#
+# model.set_weights(best_weights)
+# model.save("CP_DDDQN_model.h5")
+# plt.plot(rewards)
+# plt.show()
+#
+# env.seed(43)
+# state = env.reset()
+# for step in range(1000):
+#     action = epsilon_greedy_policy(state)
+#     state, reward, done, info = env.step(action)
+#     if done:
+#         print()
+#         print("Reward: ", step)
+#         env.close()
+#         break
+#     env.render(mode="rgb_array")
+# Reward:  211
 
+### TF-Agents
 
-
-
-
-
-
-
-
-
-
-
-
+tf.random.set_seed(42)
+np.random.seed(42)
+print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+env = suite_gym.load("Breakout-v4")
+print(env)
