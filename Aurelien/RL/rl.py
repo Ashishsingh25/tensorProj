@@ -554,6 +554,20 @@ from tf_agents.environments import suite_gym
 
 tf.random.set_seed(42)
 np.random.seed(42)
-print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
+
 env = suite_gym.load("Breakout-v4")
-print(env)
+# print(env)
+# <tf_agents.environments.wrappers.TimeLimit object at 0x000001F61121AFC8>
+# print(env.gym)
+# <AtariEnv<Breakout-v4>>
+env.seed(42)
+env.reset()
+plt.imshow(env.render(mode="rgb_array"))
+plt.show()
+print(env.action_space)
+
+# print(env.step(1)) # Fire
+# plt.imshow(env.render(mode="rgb_array"))
+# plt.show()
+
+env.close()
