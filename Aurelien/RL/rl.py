@@ -5,6 +5,10 @@ from tensorflow import keras
 import tensorflow as tf
 from collections import deque
 from tf_agents.environments import suite_gym
+from tf_agents.environments import suite_atari
+from tf_agents.environments.atari_preprocessing import AtariPreprocessing
+from tf_agents.environments.atari_wrappers import FrameStack4
+from tf_agents.environments.tf_py_environment import TFPyEnvironment
 
 # env = gym.make('CartPole-v1')
 # env.seed(42)
@@ -552,22 +556,71 @@ from tf_agents.environments import suite_gym
 
 ### TF-Agents
 
-tf.random.set_seed(42)
-np.random.seed(42)
+# tf.random.set_seed(42)
+# np.random.seed(42)
 
-env = suite_gym.load("Breakout-v4")
+# env = suite_gym.load("Breakout-v4")
 # print(env)
 # <tf_agents.environments.wrappers.TimeLimit object at 0x000001F61121AFC8>
 # print(env.gym)
 # <AtariEnv<Breakout-v4>>
-env.seed(42)
-env.reset()
-plt.imshow(env.render(mode="rgb_array"))
-plt.show()
-print(env.action_space)
-
-# print(env.step(1)) # Fire
+# env.seed(42)
+# print(env.reset())
+# TimeStep(step_type=array(0), reward=array(0., dtype=float32), discount=array(1., dtype=float32), observation=array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0],
+#         ..., dtype=uint8))
 # plt.imshow(env.render(mode="rgb_array"))
 # plt.show()
+# print(env.current_time_step())
+# print(env.observation_spec())
+# BoundedArraySpec(shape=(210, 160, 3), dtype=dtype('uint8'), name='observation', minimum=0, maximum=255)
+# print(env.action_spec())
+# BoundedArraySpec(shape=(), dtype=dtype('int64'), name='action', minimum=0, maximum=3)
+# print(env.time_step_spec())
+# TimeStep(step_type=ArraySpec(shape=(), dtype=dtype('int32'), name='step_type'),
+#          reward=ArraySpec(shape=(), dtype=dtype('float32'), name='reward'),
+#          discount=BoundedArraySpec(shape=(), dtype=dtype('float32'), name='discount', minimum=0.0, maximum=1.0),
+#          observation=BoundedArraySpec(shape=(210, 160, 3), dtype=dtype('uint8'),
+#                                       name='observation', minimum=0, maximum=255))
+# print(env.gym.get_action_meanings())
+# ['NOOP', 'FIRE', 'RIGHT', 'LEFT']
+# env.close()
 
-env.close()
+### Environment Wrappers
+
+max_episode_steps = 27000 # <=> 108k ALE frames since 1 step = 4 frames
+environment_name = "BreakoutNoFrameskip-v4"
+
+env = suite_atari.load(
+    environment_name,
+    max_episode_steps=max_episode_steps,
+    gym_env_wrappers=[AtariPreprocessing, FrameStack4])
+
+env.seed(42)
+env.reset()
+# action = np.array(1, dtype=np.int32)
+time_step = env.step(np.array(1, dtype=np.int32)) # FIRE
+for _ in range(4):
+    time_step = env.step(np.array(3, dtype=np.int32)) # LEFT
+
+def plot_observation(obs):
+    # Since there are only 3 color channels, you cannot display 4 frames
+    # with one primary color per frame. So this code computes the delta between
+    # the current frame and the mean of the other frames, and it adds this delta
+    # to the red and blue channels to get a pink color for the current frame.
+    obs = obs.astype(np.float32)
+    img = obs[..., :3]
+    current_frame_delta = np.maximum(obs[..., 3] - obs[..., :3].mean(axis=-1), 0.)
+    img[..., 0] += current_frame_delta
+    img[..., 2] += current_frame_delta
+    img = np.clip(img / 150, 0, 1)
+    plt.imshow(img)
+    plt.axis("off")
+
+plt.figure(figsize=(6, 6))
+plot_observation(time_step.observation)
+# save_fig("preprocessed_breakout_plot")
+plt.show()
+
+tf_env = TFPyEnvironment(env)
