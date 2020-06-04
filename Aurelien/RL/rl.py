@@ -9,6 +9,18 @@ from tf_agents.environments import suite_atari
 from tf_agents.environments.atari_preprocessing import AtariPreprocessing
 from tf_agents.environments.atari_wrappers import FrameStack4
 from tf_agents.environments.tf_py_environment import TFPyEnvironment
+from tf_agents.networks.q_network import QNetwork
+from tf_agents.agents.dqn.dqn_agent import DqnAgent
+from tf_agents.replay_buffers import tf_uniform_replay_buffer
+from tf_agents.metrics import tf_metrics
+from tf_agents.drivers.dynamic_step_driver import DynamicStepDriver
+from tf_agents.policies.random_tf_policy import RandomTFPolicy
+from tf_agents.trajectories.trajectory import to_transition
+from tf_agents.utils.common import function
+from tf_agents.eval.metric_utils import log_metrics
+import logging
+import PIL
+import os
 
 # env = gym.make('CartPole-v1')
 # env.seed(42)
@@ -600,9 +612,9 @@ env = suite_atari.load(
 env.seed(42)
 env.reset()
 # action = np.array(1, dtype=np.int32)
-time_step = env.step(np.array(1, dtype=np.int32)) # FIRE
-for _ in range(4):
-    time_step = env.step(np.array(3, dtype=np.int32)) # LEFT
+# time_step = env.step(np.array(1, dtype=np.int32)) # FIRE
+# for _ in range(4):
+#     time_step = env.step(np.array(3, dtype=np.int32)) # LEFT
 
 def plot_observation(obs):
     # Since there are only 3 color channels, you cannot display 4 frames
@@ -618,9 +630,179 @@ def plot_observation(obs):
     plt.imshow(img)
     plt.axis("off")
 
-plt.figure(figsize=(6, 6))
-plot_observation(time_step.observation)
-# save_fig("preprocessed_breakout_plot")
-plt.show()
+# plt.figure(figsize=(6, 6))
+# plot_observation(time_step.observation)
+# plt.show()
 
 tf_env = TFPyEnvironment(env)
+
+### Creating DQN
+
+preprocessing_layer = keras.layers.Lambda(lambda obs: tf.cast(obs, np.float32) / 255.)
+conv_layer_params=[(32, (8, 8), 4), (64, (4, 4), 2), (64, (3, 3), 1)]
+fc_layer_params=[512]
+q_net = QNetwork(
+    tf_env.observation_spec(),
+    tf_env.action_spec(),
+    preprocessing_layers=preprocessing_layer,
+    conv_layer_params=conv_layer_params,
+    fc_layer_params=fc_layer_params)
+
+# DQN Agent
+
+train_step = tf.Variable(0)
+update_period = 4 # run a training step every 4 collect steps
+optimizer = tf.compat.v1.train.RMSPropOptimizer(learning_rate=2.5e-4, decay=0.95, momentum=0.0,
+                                     epsilon=0.00001, centered=True)
+epsilon_fn = keras.optimizers.schedules.PolynomialDecay(
+    initial_learning_rate=1.0, # initial ε
+    decay_steps=250000 // update_period, # <=> 1,000,000 ALE frames
+    end_learning_rate=0.01) # final ε
+agent = DqnAgent(tf_env.time_step_spec(),
+                 tf_env.action_spec(),
+                 q_network=q_net,
+                 optimizer=optimizer,
+                 target_update_period=2000, # <=> 32,000 ALE frames
+                 td_errors_loss_fn=keras.losses.Huber(reduction="none"),
+                 gamma=0.99, # discount factor
+                 train_step_counter=train_step,
+                 epsilon_greedy=lambda: epsilon_fn(train_step))
+agent.initialize()
+
+# Replay buffer
+
+replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
+    data_spec=agent.collect_data_spec,
+    batch_size=tf_env.batch_size,
+    max_length=100000)
+replay_buffer_observer = replay_buffer.add_batch
+
+# progess message
+
+class ShowProgress:
+    def __init__(self, total):
+        self.counter = 0
+        self.total = total
+    def __call__(self, trajectory):
+        if not trajectory.is_boundary():
+            self.counter += 1
+        if self.counter % 100 == 0:
+            print("\r{}/{}".format(self.counter, self.total), end="")
+
+# training metrics
+
+train_metrics = [tf_metrics.NumberOfEpisodes(),
+                 tf_metrics.EnvironmentSteps(),
+                 tf_metrics.AverageReturnMetric(),
+                 tf_metrics.AverageEpisodeLengthMetric()]
+
+# Collect driver
+
+collect_driver = DynamicStepDriver(tf_env,
+                                   agent.collect_policy,
+                                   observers=[replay_buffer_observer] + train_metrics,
+                                   num_steps=update_period) # collect 4 steps for each training iteration
+
+# Initial experiences, before training
+
+initial_collect_policy = RandomTFPolicy(tf_env.time_step_spec(),
+                                        tf_env.action_spec())
+init_driver = DynamicStepDriver(
+    tf_env,
+    initial_collect_policy,
+    observers=[replay_buffer.add_batch, ShowProgress(2000)],
+    num_steps=2000) # <=> 80,000 ALE frames
+final_time_step, final_policy_state = init_driver.run()
+
+# 2 sub-episodes, with 3 time steps
+
+# tf.random.set_seed(888) # chosen to show an example of trajectory at the end of an episode
+# trajectories, buffer_info = replay_buffer.get_next(sample_batch_size=2, num_steps=3)
+# print(trajectories._fields)
+# ('step_type', 'observation', 'action', 'policy_info', 'next_step_type', 'reward', 'discount')
+# print(trajectories.observation.shape)
+# (2, 3, 84, 84, 4)
+# time_steps, action_steps, next_time_steps = to_transition(trajectories)
+# print(time_steps.observation.shape)
+# (2, 2, 84, 84, 4)
+# print(trajectories.step_type.numpy())
+# [[1 1 1]
+#  [1 1 1]]
+# plt.figure(figsize=(10, 6.8))
+# for row in range(2):
+#     for col in range(3):
+#         plt.subplot(2, 3, row * 3 + col + 1)
+#         plot_observation(trajectories.observation[row, col].numpy())
+# plt.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0, wspace=0.02)
+# plt.show()
+
+# dataset
+
+dataset = replay_buffer.as_dataset(
+    sample_batch_size=64,
+    num_steps=2,
+    num_parallel_calls=3).prefetch(3)
+
+collect_driver.run = function(collect_driver.run)
+agent.train = function(agent.train)
+
+# training
+
+# logging.getLogger().setLevel(logging.INFO)
+log_metrics(train_metrics)
+
+def train_agent(n_iterations):
+    time_step = None
+    policy_state = agent.collect_policy.get_initial_state(tf_env.batch_size)
+    iterator = iter(dataset)
+    for iteration in range(n_iterations):
+        time_step, policy_state = collect_driver.run(time_step, policy_state)
+        trajectories, buffer_info = next(iterator)
+        train_loss = agent.train(trajectories)
+        print("\r{} loss:{:.5f}".format(
+            iteration, train_loss.loss.numpy()), end="")
+        if iteration % 1000 == 0:
+            log_metrics(train_metrics)
+
+train_agent(n_iterations=10000)
+
+frames = []
+def save_frames(trajectory):
+    global frames
+    frames.append(tf_env.pyenv.envs[0].render(mode="rgb_array"))
+
+prev_lives = tf_env.pyenv.envs[0].ale.lives()
+def reset_and_fire_on_life_lost(trajectory):
+    global prev_lives
+    lives = tf_env.pyenv.envs[0].ale.lives()
+    if prev_lives != lives:
+        tf_env.reset()
+        tf_env.pyenv.envs[0].step(np.array(1, dtype=np.int32))
+        prev_lives = lives
+
+watch_driver = DynamicStepDriver(
+    tf_env,
+    agent.policy,
+    observers=[save_frames, reset_and_fire_on_life_lost, ShowProgress(1000)],
+    num_steps=1000)
+final_time_step, final_policy_state = watch_driver.run()
+
+image_path = os.path.join("D:\\tensor\\Aurelien\\RL","breakout.gif")
+frame_images = [PIL.Image.fromarray(frame) for frame in frames[:150]]
+frame_images[0].save(image_path, format='GIF',
+                     append_images=frame_images[1:],
+                     save_all=True,
+                     duration=30,
+                     loop=0)
+
+
+
+
+
+
+
+
+
+
+
+
