@@ -609,7 +609,7 @@ env = suite_atari.load(
     max_episode_steps=max_episode_steps,
     gym_env_wrappers=[AtariPreprocessing, FrameStack4])
 
-env.seed(42)
+env.seed(420)
 env.reset()
 # action = np.array(1, dtype=np.int32)
 # time_step = env.step(np.array(1, dtype=np.int32)) # FIRE
