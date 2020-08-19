@@ -34,3 +34,5 @@ model_name = "my_mnist_model"
 model_path = os.path.join(model_name, model_version)
 print(model_path)
 tf.saved_model.save(model, model_path)
+
+
